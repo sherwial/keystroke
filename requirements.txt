@@ -1,0 +1,7 @@
+protobuf
+tensorflow
+matplotlib
+keras
+h5py
+pathos
+
