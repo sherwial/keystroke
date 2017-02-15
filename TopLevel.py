@@ -177,57 +177,57 @@ class CrossEvaluationAlg(object):
 
     def cross_evaluate(self, name):
         results_dict = {}
-        profile = self.profiles[self.username_array.index(name)]
-        m_net = MonographNetwork()
-        d_net = DigraphNetwork()
-        m_net.load_weights("savedweights/" + name + "_mono.h5")
-        d_net.load_weights("savedweights/" + name + "_di.h5")
-
-        profile["mono_map"].build_mko_map()
-        profile["di_map"].build_dko_map()
-        monograph_map = profile["mono_map"].get_mko_map()
-        digraph_map = profile["di_map"].get_dko_map()
-        print "User: " + name
-        data_index = self.username_array.index(name) + 1
-        for attacker_name in self.username_array:
-            print "     Attacked by: " + attacker_name
-            print "         Current index: " + str(data_index)
-            print "         Lengths: "
-            print "             Mono: " + str(len(self.data_array[attacker_name][0]))
-            print "             Di: " + str(len(self.data_array[attacker_name][1]))
-            attacking_data_mono = self.data_array[attacker_name][0][data_index]
-            attacker_data_di = self.data_array[attacker_name][1][data_index]
-
-            summation = 0.0
-            total_count = float(0.0)
-            for graph in attacking_data_mono:
-                try:
-                    ko = monograph_map[graph[0]]
-                except:
-                    continue
-                approx = m_net.guess(numpy.array([ko]))[0][0]
-                summation = summation + abs((graph[1] - approx) * 100 / approx)
-                total_count += 1
-            mono_deviation = summation / total_count
-
-            summation = 0.0
-            total_count = float(0.0)
-            for graph in attacker_data_di:
-                try:
-                    ko1 = digraph_map[graph[0]]
-                    ko2 = digraph_map[graph[1]]
-                except:
-                    continue
-
-                approx = profile['norm_di'].inverse_normalize(d_net.guess(numpy.array([[ko1, ko2]]))[0][0])
-                summation = summation + abs((graph[2] - approx) * 100 / approx)
-                total_count += 1
-            di_deviation =  summation / total_count
-
-            beta = 0.5
-            current_result = beta*mono_deviation + (1-beta)*di_deviation
-            results_dict[attacker_name] = current_result
-        print "     Done with " + attacker_name
+        # profile = self.profiles[self.username_array.index(name)]
+        # m_net = MonographNetwork()
+        # d_net = DigraphNetwork()
+        # m_net.load_weights("savedweights/" + name + "_mono.h5")
+        # d_net.load_weights("savedweights/" + name + "_di.h5")
+        #
+        # profile["mono_map"].build_mko_map()
+        # profile["di_map"].build_dko_map()
+        # monograph_map = profile["mono_map"].get_mko_map()
+        # digraph_map = profile["di_map"].get_dko_map()
+        # print "User: " + name
+        # data_index = self.username_array.index(name) + 1
+        # for attacker_name in self.username_array:
+        #     print "     Attacked by: " + attacker_name
+        #     print "         Current index: " + str(data_index)
+        #     print "         Lengths: "
+        #     print "             Mono: " + str(len(self.data_array[attacker_name][0]))
+        #     print "             Di: " + str(len(self.data_array[attacker_name][1]))
+        #     attacking_data_mono = self.data_array[attacker_name][0][data_index]
+        #     attacker_data_di = self.data_array[attacker_name][1][data_index]
+        #
+        #     summation = 0.0
+        #     total_count = float(0.0)
+        #     for graph in attacking_data_mono:
+        #         try:
+        #             ko = monograph_map[graph[0]]
+        #         except:
+        #             continue
+        #         approx = m_net.guess(numpy.array([ko]))[0][0]
+        #         summation = summation + abs((graph[1] - approx) * 100 / approx)
+        #         total_count += 1
+        #     mono_deviation = summation / total_count
+        #
+        #     summation = 0.0
+        #     total_count = float(0.0)
+        #     for graph in attacker_data_di:
+        #         try:
+        #             ko1 = digraph_map[graph[0]]
+        #             ko2 = digraph_map[graph[1]]
+        #         except:
+        #             continue
+        #
+        #         approx = profile['norm_di'].inverse_normalize(d_net.guess(numpy.array([[ko1, ko2]]))[0][0])
+        #         summation = summation + abs((graph[2] - approx) * 100 / approx)
+        #         total_count += 1
+        #     di_deviation =  summation / total_count
+        #
+        #     beta = 0.5
+        #     current_result = beta*mono_deviation + (1-beta)*di_deviation
+        #     results_dict[attacker_name] = current_result
+        # print "     Done with " + attacker_name
         return results_dict
 
 def pickup():
