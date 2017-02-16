@@ -7,7 +7,11 @@ import shutil
 from mapper import mono_map, di_map
 from utils import neuralnet_mapper_link
 import numpy
-import pickle
+import itertools
+import gc
+import cPickle as pickle
+import threading
+import sys
 
 MONOGRAPH_PATH_RAW = "KeystrokeData/monograph/"
 DIGRAPH_PATH_RAW = "KeystrokeData/digraph/"
@@ -58,6 +62,7 @@ def generate_cross_validation_data_from_users(username_array):
     [(1500),(500),(500)...x40...,(500),(500)]
 
     """
+
     data_dict = {}
     for name in username_array:
         with open(MONOGRAPH_PATH_RAW + name + ".txt") as monofile:
@@ -136,6 +141,9 @@ def extract_enrollment_samples(cross_validation_profile):
 
 class CrossEvaluationAlg(object):
     def __init__(self, username_array, data_array, profiles):
+        gc.enable()
+        self.map = Pool(4).map
+
         if username_array is None:
             self.username_array = [file.split('.')[0] for root, dir, files in os.walk(MONOGRAPH_PATH_RAW) for file in files]
 
@@ -143,14 +151,15 @@ class CrossEvaluationAlg(object):
 
         if data_array is None:
             self.data_array = generate_cross_validation_data_from_users(self.username_array)
+            for key in self.data_array.keys():
+                if self.data_array[key] is None:
+                    print "     " + key
+                    self.data_array.pop(key)
+                    self.username_array.remove(key)
             with open("data.pickle", "wb") as f:pickle.dump(self.data_array,f)
-        else: self.data_array = data_array
 
-        for key in self.data_array.keys():
-            if self.data_array[key] is None:
-                print "     " + key
-                self.data_array.pop(key)
-                self.username_array.remove(key)
+        else:
+            self.data_array = data_array
 
         if profiles is None:
             try:shutil.rmtree('savedweights')
@@ -158,7 +167,6 @@ class CrossEvaluationAlg(object):
             os.mkdir('savedweights')
             p = multiprocessing.Pool(4)
             enrollment_samples_users = p.map(extract_enrollment_samples, [self.data_array[key] for key in self.data_array.keys()])
-            # enrollment_samples_users = map(extract_enrollment_samples, [self.data_array[key] for key in self.data_array.keys()])
             for index, val in enumerate(enrollment_samples_users):
                 enrollment_samples_users[index]["name"] = (self.username_array[index])
             start = time.time()
@@ -169,66 +177,83 @@ class CrossEvaluationAlg(object):
             print "Ending time: " + str(time.time() - start)
         else: self.profiles = profiles
 
-        with open("usernames.pickle", "wb") as f: pickle.dump(self.username_array, f)
+        # with open("usernames.pickle", "wb") as f: pickle.dump(self.username_array, f)
+        # self.results = {}
+        self.mapping_scheme = list(itertools.product(self.username_array, self.username_array))
+        results = self.build_results()
+        with open("results.pickle", "wb") as f:pickle.dump(self.results, f)
 
-        p2 = Pool(2)
-        results = p2.map(self.cross_evaluate, self.username_array)
-        with open("results.pickle", "wb") as f:pickle.dump(results, f)
+    def build_results(self):
+        print "Building results..."
+        b = BuildResults(self.username_array, self.mapping_scheme, self.profiles, self.data_array)
+        return b.run()
 
-    def cross_evaluate(self, name):
-        results_dict = {}
-        # profile = self.profiles[self.username_array.index(name)]
-        # m_net = MonographNetwork()
-        # d_net = DigraphNetwork()
-        # m_net.load_weights("savedweights/" + name + "_mono.h5")
-        # d_net.load_weights("savedweights/" + name + "_di.h5")
-        #
-        # profile["mono_map"].build_mko_map()
-        # profile["di_map"].build_dko_map()
-        # monograph_map = profile["mono_map"].get_mko_map()
-        # digraph_map = profile["di_map"].get_dko_map()
-        # print "User: " + name
-        # data_index = self.username_array.index(name) + 1
-        # for attacker_name in self.username_array:
-        #     print "     Attacked by: " + attacker_name
-        #     print "         Current index: " + str(data_index)
-        #     print "         Lengths: "
-        #     print "             Mono: " + str(len(self.data_array[attacker_name][0]))
-        #     print "             Di: " + str(len(self.data_array[attacker_name][1]))
-        #     attacking_data_mono = self.data_array[attacker_name][0][data_index]
-        #     attacker_data_di = self.data_array[attacker_name][1][data_index]
-        #
-        #     summation = 0.0
-        #     total_count = float(0.0)
-        #     for graph in attacking_data_mono:
-        #         try:
-        #             ko = monograph_map[graph[0]]
-        #         except:
-        #             continue
-        #         approx = m_net.guess(numpy.array([ko]))[0][0]
-        #         summation = summation + abs((graph[1] - approx) * 100 / approx)
-        #         total_count += 1
-        #     mono_deviation = summation / total_count
-        #
-        #     summation = 0.0
-        #     total_count = float(0.0)
-        #     for graph in attacker_data_di:
-        #         try:
-        #             ko1 = digraph_map[graph[0]]
-        #             ko2 = digraph_map[graph[1]]
-        #         except:
-        #             continue
-        #
-        #         approx = profile['norm_di'].inverse_normalize(d_net.guess(numpy.array([[ko1, ko2]]))[0][0])
-        #         summation = summation + abs((graph[2] - approx) * 100 / approx)
-        #         total_count += 1
-        #     di_deviation =  summation / total_count
-        #
-        #     beta = 0.5
-        #     current_result = beta*mono_deviation + (1-beta)*di_deviation
-        #     results_dict[attacker_name] = current_result
-        # print "     Done with " + attacker_name
-        return results_dict
+class BuildResults(object):
+    def __init__(self, username_array, mapping_scheme, profiles, data_array):
+        self.map = Pool(4).map
+        self.mapping_scheme = mapping_scheme
+        self.profiles = profiles
+        self.username_array = username_array
+        self.data_array = data_array
+
+    def run(self):
+        return self.map(self.cross_evaluate, self.mapping_scheme)
+
+    def cross_evaluate(self, tuple_names):
+        name = tuple_names[0]
+        attacker_name = tuple_names[1]
+        print name + " attacking " + attacker_name
+        sys.stdout.flush()
+        profile = self.profiles[self.username_array.index(name)]
+        m_net = MonographNetwork()
+        d_net = DigraphNetwork()
+        m_net.load_weights("savedweights/" + name + "_mono.h5")
+        d_net.load_weights("savedweights/" + name + "_di.h5")
+
+        profile["mono_map"].build_mko_map()
+        profile["di_map"].build_dko_map()
+        monograph_map = profile["mono_map"].get_mko_map()
+        digraph_map = profile["di_map"].get_dko_map()
+        attacking_data_mono = self.data_array[attacker_name][0]
+        attacker_data_di = self.data_array[attacker_name][1]
+
+        trials_array = []
+        for i in range(1, 40):
+            print "     Sample: " + str(i)
+            sum_array = []
+            total_count = float(0.0)
+            curr_attck_data_m = attacking_data_mono[i]
+            curr_attck_data_d = attacker_data_di[i]
+            for graph in curr_attck_data_m:
+                try:
+                    ko = monograph_map[graph[0]]
+                except:
+                    continue
+                approx = m_net.guess(numpy.array([ko]))[0][0]
+                sum_array.append(summation + abs((graph[1] - approx) * 100 / approx))
+                total_count += 1
+            summation = sum(sum_array)
+            mono_deviation = summation / total_count
+
+            sum_array = []
+            total_count = float(0.0)
+            for graph in curr_attck_data_d:
+                try:
+                    ko1 = digraph_map[graph[0]]
+                    ko2 = digraph_map[graph[1]]
+                except:
+                    continue
+
+                approx = profile['norm_di'].inverse_normalize(d_net.guess(numpy.array([[ko1, ko2]]))[0][0])
+                sum_array.append(abs((graph[2] - approx) * 100 / approx))
+                total_count += 1
+            summation = sum(sum_array)
+            di_deviation = summation / total_count
+
+            beta = 0.5
+            current_result = beta*mono_deviation + (1-beta)*di_deviation
+            trials_array.append(current_result)
+        return trials_array
 
 def pickup():
     with open("profiles.pickle", "rb") as f:profiles = pickle.load(f)
@@ -237,5 +262,5 @@ def pickup():
     c = CrossEvaluationAlg(username_array, data_array, profiles)
 
 if __name__ == '__main__':
-    c = CrossEvaluationAlg(None, None, None)
-    # pickup()
+    # c = CrossEvaluationAlg(None, None, None)
+    pickup()
