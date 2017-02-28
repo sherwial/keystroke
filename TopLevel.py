@@ -50,9 +50,6 @@ def train(enrollment_data):
     di_net.save_weights('savedweights/' + enrollment_data['name'].split('.')[0] + "_di.h5")
 
     # Return profile
-
-    monograph_map.build_mko_map()
-    monograph_map.build_dko_map()
     profile = {}
     profile['mono_map'] = monograph_map.get_mko_map()
     profile['di_map'] = digraph_map.get_dko_map()
@@ -180,8 +177,8 @@ def cross_evaluate(tuple_names):
     profile = myglobaldata.profiles[myglobaldata.username_array.index(name)]
     m_net = myglobaldata.network_dict[name][0]
     d_net = myglobaldata.network_dict[name][1]
-    monograph_map = profile["mono_map"].get_mko_map()
-    digraph_map = profile["di_map"].get_dko_map()
+    monograph_map = profile["mono_map"]
+    digraph_map = profile["di_map"]
     attacking_data_mono = myglobaldata.data_array[attacker_name][0]
     attacker_data_di = myglobaldata.data_array[attacker_name][1]
 
@@ -224,7 +221,6 @@ def cross_evaluate(tuple_names):
     return trials_array
 
 
-
 class BuildResults(object):
     def __init__(self):
         self.p = multiprocessing.Pool(4)
@@ -232,60 +228,8 @@ class BuildResults(object):
     def run(self):
         return self.p.map(cross_evaluate, myglobaldata.mapping_scheme)
 
-    # def cross_evaluate(self, tuple_names):
-    #     name = tuple_names[0]
-    #     attacker_name = tuple_names[1]
-    #     print name + " attacking " + attacker_name
-    #     print myglobaldata.username_array
-    #     profile = myglobaldata.profiles[myglobaldata.username_array.index(name)]
-    #     m_net = myglobaldata.network_dict[name][0]
-    #     d_net = myglobaldata.network_dict[name][1]
-    #
-    #     monograph_map = profile["mono_map"].get_mko_map()
-    #     digraph_map = profile["di_map"].get_dko_map()
-    #     attacking_data_mono = myglobaldata.data_array[attacker_name][0]
-    #     attacker_data_di = myglobaldata.data_array[attacker_name][1]
-    #
-    #     trials_array = []
-    #     for i in range(1, 40):
-    #         curr_attck_data_m = attacking_data_mono[i]
-    #         curr_attck_data_d = attacker_data_di[i]
-    #
-    #         def generate_difference_mono(graph):
-    #             try:
-    #                 ko = monograph_map[graph[0]]
-    #             except:
-    #                 return 0
-    #             approx = m_net.guess(numpy.array([ko]))[0][0]
-    #             return abs((graph[1] - approx) * 100 / approx)
-    #
-    #         sum_array = map(generate_difference_mono, [graph for graph in curr_attck_data_m])
-    #         total_count = float(len(sum_array))
-    #         summation = sum(sum_array)
-    #         mono_deviation = summation / total_count
-    #
-    #         def generate_difference_di(graph):
-    #             try:
-    #                 ko1 = digraph_map[graph[0]]
-    #                 ko2 = digraph_map[graph[1]]
-    #             except:
-    #                 return 0
-    #             approx = profile['norm_di'].inverse_normalize(d_net.guess(numpy.array([[ko1, ko2]]))[0][0])
-    #             return abs((graph[2] - approx) * 100 / approx)
-    #
-    #         sum_array = map(generate_difference_di, [graph for graph in curr_attck_data_d])
-    #         summation = sum(sum_array)
-    #         total_count = float(len(sum_array))
-    #         di_deviation = summation / total_count
-    #
-    #         beta = 0.5
-    #         current_result = beta*mono_deviation + (1-beta)*di_deviation
-    #         trials_array.append(current_result)
-    #
-    #         gc.collect()
-    #     return trials_array
-
 if __name__ == '__main__':
-    # c = CrossEvaluationAlg(None, None, None)
-    b = BuildResults()
-    results = b.run()
+    c = CrossEvaluationAlg(None, None, None)
+    # b = BuildResults()
+    # results = b.run()
+    # with open("results.pickle", "wb") as f: pickle.dump(results, f)
