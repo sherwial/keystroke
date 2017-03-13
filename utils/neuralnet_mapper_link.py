@@ -6,19 +6,24 @@ def to_training_data_mono(mono_dict, map):
     :param map:
     :return:
     """
+    array = []
+    for item in mono_dict:
+        for number in mono_dict[item]:
+            array.append(number)
+    normalizer = MinMaxNormalize(array)
+
     training_in = []
     training_out = []
     for monograph in mono_dict:
         try:
             ko = map[monograph]
             for dwell_time in mono_dict[monograph]:
-                # if dwell_time < 700:
                     training_in.append(ko)
-                    training_out.append(dwell_time)
+                    training_out.append(normalizer.normalize(dwell_time))
         except:
             pass
             # print "Failed with " + str(monograph)
-    return np.array(training_in), np.array(training_out)
+    return np.array(training_in), np.array(training_out), normalizer
 
 
 def to_training_data_di(digraph_dict, map):

@@ -13,6 +13,8 @@ import cPickle as pickle
 import threading
 import sys
 import myglobaldata
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 MONOGRAPH_PATH_RAW = "KeystrokeData/monograph/"
 DIGRAPH_PATH_RAW = "KeystrokeData/digraph/"
@@ -32,7 +34,7 @@ def train(enrollment_data):
 
     # print "     Obtaining training data..."
     # OBTAIN THE TRAINING DATA FROM THE MAPS
-    training_inputs_mono, training_outputs_mono = \
+    training_inputs_mono, training_outputs_mono, normalizer_mono = \
         neuralnet_mapper_link.to_training_data_mono(enrollment_data['mono'], current_mono_map)
     training_inputs_di, training_outputs_di, normalizer_di = \
         neuralnet_mapper_link.to_training_data_di(enrollment_data['di'], current_di_map)
@@ -42,22 +44,23 @@ def train(enrollment_data):
     di_net = DigraphNetwork()
 
     # TRAIN THE NETWORKS
-    mono_net.train(training_inputs_mono, training_outputs_mono, 200, int(len(training_inputs_mono) / 3))
-    di_net.train(training_inputs_di, training_outputs_di, 500, int(len(training_inputs_di) / 5))
-
+    mono_net.train(training_inputs_mono, training_outputs_mono, 200, int(len(training_inputs_mono) / 9))
+    di_net.train(training_inputs_di, training_outputs_di, 500, int(len(training_inputs_di) / 9))
+    print enrollment_data['name']
     # SAVE THE NETWORKS
     mono_net.save_weights('savedweights/' + enrollment_data['name'].split('.')[0] + "_mono.h5")
     di_net.save_weights('savedweights/' + enrollment_data['name'].split('.')[0] + "_di.h5")
-
+    print enrollment_data['name']
     # Return profile
     profile = {}
     profile['mono_map'] = monograph_map.get_mko_map()
     profile['di_map'] = digraph_map.get_dko_map()
     profile['norm_di'] = normalizer_di
+    profile['norm_mono'] = normalizer_mono
     return profile
 
 def generate_cross_validation_data_from_users(username_array):
-    """
+    """p
     Obtains and splits data from users into chunks as specified by Ahmed and Traore
 
     [(1500),(500),(500)...x40...,(500),(500)]
@@ -70,8 +73,6 @@ def generate_cross_validation_data_from_users(username_array):
             if len(data) < 21500:
                 data_dict[name] = None
                 continue
-            if len(data) < 21500:
-                print "Bad code"
             numpy.random.shuffle(data)
             enrollment_sample = []
             for i in range(0, 1500):
@@ -93,8 +94,6 @@ def generate_cross_validation_data_from_users(username_array):
             if len(data) < 21500:
                 data_dict[name] = None
                 continue
-            if len(data) < 21500:
-                print "Bad code"
             numpy.random.shuffle(data)
             enrollment_sample = []
             for i in range(0, 1500):
@@ -163,8 +162,7 @@ class CrossEvaluationAlg(object):
             enrollment_samples_users[index]["name"] = (self.username_array[index])
         start = time.time()
         print "Mapping data and training networks... " + str(start)
-        pool = multiprocessing.Pool(7)
-        self.profiles = pool.map(train, enrollment_samples_users)
+        self.profiles = p.map(train, enrollment_samples_users)
         with open("profiles.pickle", "wb") as f:pickle.dump(self.profiles, f)
         print "Ending time: " + str(time.time() - start)
 
@@ -192,7 +190,7 @@ def cross_evaluate(tuple_names):
                 ko = monograph_map[graph[0]]
             except:
                 return 0
-            approx = m_net.guess(numpy.array([ko]))[0][0]
+            approx = profile['norm_di'].inverse_normalize(m_net.guess(numpy.array([ko]))[0][0])
             return abs((graph[1] - approx) * 100 / approx)
 
         sum_array = map(generate_difference_mono, [graph for graph in curr_attck_data_m])
@@ -217,19 +215,66 @@ def cross_evaluate(tuple_names):
         beta = 0.5
         current_result = beta*mono_deviation + (1-beta)*di_deviation
         trials_array.append(current_result)
-
     return trials_array
-
 
 class BuildResults(object):
     def __init__(self):
         self.p = multiprocessing.Pool(4)
-
     def run(self):
         return self.p.map(cross_evaluate, myglobaldata.mapping_scheme)
 
+def get_some_graphs(name, attacker_name):
+    attacking_data_mono = myglobaldata.data_array[attacker_name][0]
+    attacking_data_di = myglobaldata.data_array[attacker_name][1]
+    user_data_mono = myglobaldata.data_array[name][0][1]
+
+    profile = myglobaldata.profiles[myglobaldata.username_array.index(name)]
+    m_net = myglobaldata.network_dict[name][0]
+    d_net = myglobaldata.network_dict[name][1]
+    monograph_map = profile["mono_map"]
+    digraph_map = profile["di_map"]
+    testingmono = numpy.array([i[0] for i in attacking_data_mono[1]])
+    testingdi = numpy.array([i[0] for i in attacking_data_di[1]])
+    curr_attck_data_m = attacking_data_mono[1]
+    curr_attck_data_d = attacking_data_di[1]
+
+    def generate_difference_mono(graph):
+        try:
+            ko = monograph_map[graph[0]]
+        except:
+            return 0
+        approx = profile['norm_mono'].inverse_normalize(m_net.guess(numpy.array([ko]))[0][0])
+        return ko, approx
+
+    def generate_difference_di(graph):
+        try:
+            ko1 = digraph_map[graph[0]]
+            ko2 = digraph_map[graph[1]]
+        except:
+            return (0,0,0)
+        approx = profile['norm_di'].inverse_normalize(m_net.guess(numpy.array([ko1, ko2]))[0][0])
+        return ko1, ko2, approx
+
+    array1 = map(generate_difference_mono, [graph for graph in curr_attck_data_m])
+    array2 = map(generate_difference_di, [graph for graph in curr_attck_data_d])
+    array3 = map(generate_difference_mono, [graph for graph in user_data_mono])
+
+    x1, y1 = zip(*array1)
+    x2, y2, z2 = zip(*array2)
+    x3, y3 = zip(*array3)
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1,2,1)
+    ax2 = fig.add_subplot(1,2,2)
+    ax1.plot(x1,y1,'r--',x1,[graph[1] for graph in curr_attck_data_m],'bs')
+    ax2.plot(x1,[graph[1] for graph in curr_attck_data_m],'bs',x3,[graph[1] for graph in user_data_mono],'g^')
+    plt.savefig(name + "_" + attacker_name+ ".png")
+    plt.close("all")
+
 if __name__ == '__main__':
-    c = CrossEvaluationAlg(None, None, None)
+    # c = CrossEvaluationAlg(None, None, None)
     # b = BuildResults()
     # results = b.run()
     # with open("results.pickle", "wb") as f: pickle.dump(results, f)
+    get_some_graphs(myglobaldata.username_array[0],myglobaldata.username_array[4])
+    get_some_graphs(myglobaldata.username_array[0],myglobaldata.username_array[0])

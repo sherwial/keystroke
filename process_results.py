@@ -51,10 +51,8 @@ sub2.plot(y1, y2)
 sub2.set_xlabel('FRR')
 sub2.set_ylabel('FAR')
 
-
-
 plt.tight_layout()
-plt.savefig("figure.png")
+plt.savefig("figure3.png")
 plt.close("all")
 
 for user in validation_results.keys():
@@ -105,14 +103,5 @@ sub2.set_ylabel('FAR')
 # sub2.xaxis.set_ticks(numpy.arange(0,0.04, .008))
 
 plt.tight_layout()
-plt.savefig("figure2.png")
+plt.savefig("figure4.png")
 plt.close("all")
-
-
-
-
-
-
-
-
-

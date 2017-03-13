@@ -6,9 +6,9 @@ import h5py
 class DigraphNetwork:
     def __init__(self):
         self.model = Sequential() # Implement sequential model (stacked layers)
-        self.model.add(Dense(1, input_dim=2, init='uniform', activation='tanh')) # Input layer
+        self.model.add(Dense(1, input_dim=2, init='uniform', activation='linear')) # Input layer
         self.model.add(Dense(40, init='uniform', activation='tanh')) # Hidden layer
-        self.model.add(Dense(10, init='uniform', activation='tanh')) # Hidden layer
+        # self.model.add(Dense(10, init='uniform', activation='tanh')) # Hidden layer
         self.model.add(Dense(1, init='uniform', activation='linear')) # Output layer
         adadelta = Adadelta(lr=.9, decay=0.001) # Learning rate was 12.  Learned that was too high
         self.model.compile(loss='mse', optimizer=adadelta, metrics=['accuracy'])  # Compile model

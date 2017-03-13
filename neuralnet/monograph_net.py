@@ -9,7 +9,7 @@ class MonographNetwork:
 
         self.model.add(Dense(1, input_dim=1, init='uniform', activation='linear')) # Input layer
         self.model.add(Dense(16, init='uniform', activation='tanh'))  # Hidden layer
-        self.model.add(Dense(20, init='uniform', activation='relu'))  # Hidden layer
+        # self.model.add(Dense(20, init='uniform', activation='relu'))  # Hidden layer
         # self.model.add(Dense(3, init='uniform', activation='relu'))  # Hidden layer
         self.model.add(Dense(1, init='uniform', activation='linear')) # Output layer
 
